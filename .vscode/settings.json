@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "world.h": "c",
+        "pedestrian.h": "c",
+        "menu.h": "c",
+        "ios": "c",
+        "xiosbase": "c",
+        "xlocale": "c",
+        "stdlib.h": "c",
+        "time.h": "c",
+        "simulation.h": "c",
+        "string.h": "c",
+        "windows.h": "c",
+        "stdio.h": "c",
+        "cstdlib": "c",
+        "random": "c"
+    }
+}
