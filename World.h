@@ -20,17 +20,20 @@ typedef struct World {
     int width_;
     int height_;
     char** grid_;
+    int** stepsGrid_;
+    double** probabilityGrid_;
     char* inputFileName_;
     WorldType worldType_;
     Pedestrian* pedestrian_;
 } World;
 
-void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode, WorldType worldType, int width, int height, int K);
+void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode, WorldType worldType, int width, int height, int K, float probabilities[4]);
 void print_world(World* world);
+void print_world_summary(World* world, SimulationMode mode);
 int read_world_from_file(World* world);
 void calculate_center(World* world);
 double calculate_expected_steps(int x, int y, int midX, int midY, double probabilities[4]);
-//int calculate_probability_with_K_steps(int x, int y, int midX, int midY, int K);
+double calculate_probability_to_center(int x, int y, int midX, int midY, int K, double probabilities[4]);
 void generate_world(World* world);
 void free_world(World* world);
 

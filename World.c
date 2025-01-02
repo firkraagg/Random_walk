@@ -1,12 +1,18 @@
 #include "World.h"
 
-void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode, WorldType worldType, int width, int height, int K) {
+void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode, WorldType worldType, int width, int height, int K, float probabilities[4]) {
     world->width_ = width;
     world->height_ = height;
     world->grid_ = (char**)malloc(height * sizeof(char*));
     world->pedestrian_ = pedestrian;
     world->worldType_ = worldType;
     calculate_center(world);
+
+    double probabilities_double[4];
+    for (int i = 0; i < 4; i++) {
+        probabilities_double[i] = (double)probabilities[i];
+    }
+
     for (size_t i = 0; i < height; i++)
     {
         world->grid_[i] = (char*)malloc(width * sizeof(char));
@@ -24,11 +30,21 @@ void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode,
             } else if (mode == INTERACTIVE_MODE && world->worldType_ == WORLD_OBSTACLES_GENERATED) { 
                 generate_world(world);
             } else if (mode == SUMMARY_MODE_WITHOUT_K) {
-                //int distance = calculate_expected_steps(j, i, world->midX_, world->midY_, world->pedestrian_->probabilities_);
-                //world->grid_[i][j] = '0' + (distance % 10);
+                world->stepsGrid_ = (int**)malloc(height * sizeof(int*));
+                for (size_t i = 0; i < height; i++) {
+                    world->stepsGrid_[i] = (int*)malloc(width * sizeof(int));
+                    for (size_t j = 0; j < width; j++) {
+                        world->stepsGrid_[i][j] = calculate_expected_steps(j, i, world->midX_, world->midY_, probabilities_double);
+                    }
+                }
             } else if (mode == SUMMARY_MODE_WITH_K) {
-                //double probability = calculate_probability_with_K_steps(j, i, world->midX_, world->midY_, K);
-                //world->grid_[i][j] = '0' + (int)(probability * 10);
+                world->probabilityGrid_ = (double**)malloc(height * sizeof(double*));
+                for (size_t i = 0; i < height; i++) {
+                    world->probabilityGrid_[i] = (double*)malloc(width * sizeof(double));
+                    for (size_t j = 0; j < width; j++) {
+                        world->probabilityGrid_[i][j] = calculate_probability_to_center(j, i, K, world->midX_, world->midY_, probabilities_double);
+                    }
+                }
             }
         }
     }
@@ -44,14 +60,43 @@ void print_world(World* world) {
     printf("\n");
 }
 
+void print_world_summary(World* world, SimulationMode mode) {
+    if (mode == SUMMARY_MODE_WITHOUT_K) {
+        printf("Expected Steps to Reach the Center:\n");
+        for (size_t i = 0; i < world->height_; i++) {
+            for (size_t j = 0; j < world->width_; j++) {
+                printf("%2d ", world->stepsGrid_[i][j]);
+            }
+            printf("\n");
+        }
+    } else if (mode == SUMMARY_MODE_WITH_K) {
+        printf("Probability of Reaching the Center:\n");
+        for (size_t i = 0; i < world->height_; i++) {
+            for (size_t j = 0; j < world->width_; j++) {
+                printf("%5.1f%% ", world->probabilityGrid_[i][j] * 100);
+            }
+            printf("\n");
+        }
+    }
+    printf("\n");
+}
+
 void free_world(World* world) {
-    for (size_t i = 0; i < world->height_; i++)
-    {
-        free(world->grid_[i]);
+    if (world->stepsGrid_ != NULL) {
+        for (size_t i = 0; i < world->height_; i++) {
+            free(world->stepsGrid_[i]);
+        }
+
+        free(world->stepsGrid_);
     }
 
-    free(world->grid_);
-    world->grid_ = NULL;
+    if (world->probabilityGrid_ != NULL) {
+        for (size_t i = 0; i < world->height_; i++) {
+            free(world->probabilityGrid_[i]);
+        }
+
+        free(world->probabilityGrid_);
+    }
 }
 
 int read_world_from_file(World* world) {
@@ -124,42 +169,46 @@ void generate_world(World* world) {
     world->grid_[world->pedestrian_->y_][world->pedestrian_->x_] = 'C';
 }
 
-
 double calculate_expected_steps(int x, int y, int midX, int midY, double probabilities[4]) {
-    // Pravdepodobnosti pohybu v smere hore, dole, vľavo, vpravo
-    // [0] = pohyb hore, [1] = pohyb dole, [2] = pohyb vľavo, [3] = pohyb vpravo
-    
-    // Pre jednoduchosť použijeme Manhattanovu vzdialenosť k stredu a zohľadníme pravdepodobnosti
-    double distance = abs(x - midX) + abs(y - midY);
-    double expected_steps = 0;
-    
-    // Očakávaný počet krokov bude ovplyvnený pravdepodobnosťou pre každý smer
-    // Týmto spôsobom zahrnieme pravdepodobnosti do výpočtu
-    if (x > midX) {  // Pohyb vľavo
-        expected_steps += probabilities[2] * (x - midX);
-    } else if (x < midX) {  // Pohyb vpravo
-        expected_steps += probabilities[3] * (midX - x);
-    }
-    
-    if (y > midY) {  // Pohyb hore
-        expected_steps += probabilities[0] * (y - midY);
-    } else if (y < midY) {  // Pohyb dole
-        expected_steps += probabilities[1] * (midY - y);
-    }
-    
-    // Ak sú pravdepodobnosti rovnaké pre všetky smery, očakávaný počet krokov bude priamo úmerný vzdialenosti
-    expected_steps = distance / expected_steps;
-    
-    return expected_steps;
+    int dx = abs(x - midX);
+    int dy = abs(y - midY);
+
+    double expected_horizontal = (dx > 0) ? dx / (probabilities[2] + probabilities[3]) : 0.0;
+    double expected_vertical = (dy > 0) ? dy / (probabilities[0] + probabilities[1]) : 0.0;
+
+    return expected_horizontal + expected_vertical;
 }
 
-// int calculate_probability_with_K_steps(int x, int y, int midX, int midY, int K) {
-//     int distance = calculate_steps_to_center(x, y, midX, midY);
-//     if (distance > K) {
-//         return 0.0;  
-//     }
-//     return 1.0 - (double)distance / K;
-// }
+double calculate_probability_to_center(int x, int y, int K, int midX, int midY, double probabilities[4]) {
+    if (x == midX && y == midY) {
+        return 1.0; // Ak sme už v strede, pravdepodobnosť je 1
+    }
+    if (K == 0) {
+        return 0.0; // Ak už nemáme kroky, pravdepodobnosť je 0
+    }
+
+    double probability = 0.0;
+
+    // Pohyb hore (up)
+    if (y > 0) {
+        probability += probabilities[0] * calculate_probability_to_center(x, y - 1, K - 1, midX, midY, probabilities);
+    }
+    // Pohyb dole (down)
+    if (y < midY * 2) {
+        probability += probabilities[1] * calculate_probability_to_center(x, y + 1, K - 1, midX, midY, probabilities);
+    }
+    // Pohyb doľava (left)
+    if (x > 0) {
+        probability += probabilities[2] * calculate_probability_to_center(x - 1, y, K - 1, midX, midY, probabilities);
+    }
+    // Pohyb doprava (right)
+    if (x < midX * 2) {
+        probability += probabilities[3] * calculate_probability_to_center(x + 1, y, K - 1, midX, midY, probabilities);
+    }
+
+    return probability;
+}
+
 
 void calculate_center(World* world) {
     world->midX_ = world->width_ / 2;

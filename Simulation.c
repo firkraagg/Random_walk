@@ -7,7 +7,7 @@ Simulation* create_simulation() {
     printf("-----------Vytvaranie simulacie-----------\n");
     sim->singlePlayer_ = choose_player_mode();
     choose_world_type(sim->world_);
-    sim->mode_ = choose_mode();
+    sim->mode_ = choose_mode(sim);
     sim->numReplications_ = choose_number_of_replications();
     sim->K_ = number_of_steps();
     memcpy(sim->probabilities_, choose_probabilities(), sizeof(sim->probabilities_));
@@ -16,12 +16,7 @@ Simulation* create_simulation() {
 }
 
 void run_simulation(Simulation* simulation) {
-    initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_);
-    if (simulation->world_->worldType_ == WORLD_EMPTY)
-    {
-        initialize_position(simulation->world_);
-        simulation->world_->grid_[simulation->world_->pedestrian_->startY_][simulation->world_->pedestrian_->startX_] = 'C';
-    }
+    initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
 
     if (simulation->mode_ == INTERACTIVE_MODE)
     {
@@ -39,13 +34,15 @@ void run_simulation(Simulation* simulation) {
             }
         
         initialize_position(simulation->world_);
-        initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_);
+        initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
         }
-    } else {
+    } else if (simulation->mode_ == SUMMARY_MODE_WITHOUT_K || simulation->mode_ == SUMMARY_MODE_WITH_K) {
         Sleep(1500);
-        print_world(simulation->world_);
+        print_world_summary(simulation->world_, simulation->mode_);
     }
     
+    save_simulation_results(simulation, "output.txt");
+
     free_world(simulation->world_);
     free_pedestrian(simulation->world_->pedestrian_);
 }
@@ -59,19 +56,24 @@ float* choose_probabilities() {
     printf("Zadajte pravdepodobnosti pre pohyb chodca (Pravdepodobnost vsetkych 4 svetovych stran sa musia rovnat 1!):\n");
     
     float* array = (float*)malloc(4 * sizeof(float));
-
-    printf("1. Pohyb dolava: ");
-    scanf("%f", &array[0]);
+    do {
+        printf("1. Pohyb dolava: ");
+        scanf("%f", &array[0]);
     
-    printf("1. Pohyb doprava: ");
-    scanf("%f", &array[1]);
+        printf("1. Pohyb doprava: ");
+        scanf("%f", &array[1]);
 
-    printf("1. Pohyb hore: ");
-    scanf("%f", &array[2]);
+        printf("1. Pohyb hore: ");
+        scanf("%f", &array[2]);
 
-    printf("1. Pohyb dole: ");
-    scanf("%f", &array[3]);
+        printf("1. Pohyb dole: ");
+        scanf("%f", &array[3]);
 
+        if (array[0] + array[1] + array[2] + array[3] != 1.0f) {
+            printf("Chyba: Sucet pravdepodobnosti musi byt 1. Skuste to znova.\n");
+        }
+    } while (array[0] + array[1] + array[2] + array[3] != 1.0f);
+    
     return array;
 }
 
@@ -183,7 +185,7 @@ int number_of_steps() {
     return numberOfSteps;
 }
 
-SimulationMode choose_mode() {
+SimulationMode choose_mode(Simulation* sim) {
     printf("Zvolte si mod pre simulaciu:\n");
     printf("1. Interaktivny\n");
     printf("2. Sumarny s priemernym poctom posunov\n");

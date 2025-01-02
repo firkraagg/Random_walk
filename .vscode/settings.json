@@ -13,6 +13,7 @@
         "windows.h": "c",
         "stdio.h": "c",
         "cstdlib": "c",
-        "random": "c"
+        "random": "c",
+        "utility": "c"
     }
 }
