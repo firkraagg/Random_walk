@@ -11,12 +11,16 @@ Simulation* create_simulation() {
     sim->numReplications_ = choose_number_of_replications();
     sim->K_ = number_of_steps();
     memcpy(sim->probabilities_, choose_probabilities(), sizeof(sim->probabilities_));
-    sim->outputFileName_ = choose_output_file();
+    sim->world_->outputFileName_ = choose_output_file();
     return sim;
 }
 
 void run_simulation(Simulation* simulation) {
     initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
+    if (simulation->world_->worldType_ != WORLD_OBSTACLES_FILE)
+    {
+        initialize_position(simulation->world_);
+    }
 
     if (simulation->mode_ == INTERACTIVE_MODE)
     {
@@ -24,6 +28,8 @@ void run_simulation(Simulation* simulation) {
         {
             printf("Cislo aktualnej replikacie: %d\n", i + 1);
             printf("Celkovy pocet replikacii: %d\n", simulation->numReplications_);
+            starting_position(simulation->world_, &simulation->world_->pedestrian_->x_, &simulation->world_->pedestrian_->y_);
+            initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
             for (size_t j = 0; j < simulation->K_; j++)
             {
                 Sleep(1500);
@@ -32,23 +38,116 @@ void run_simulation(Simulation* simulation) {
 
                 fflush(stdin);
             }
-        
-        initialize_position(simulation->world_);
-        initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
         }
     } else if (simulation->mode_ == SUMMARY_MODE_WITHOUT_K || simulation->mode_ == SUMMARY_MODE_WITH_K) {
-        Sleep(1500);
         print_world_summary(simulation->world_, simulation->mode_);
     }
-    
-    save_simulation_results(simulation, "output.txt");
 
+    save_simulation_results(simulation, simulation->world_->outputFileName_);
     free_world(simulation->world_);
     free_pedestrian(simulation->world_->pedestrian_);
 }
 
-void save_simulation_results(Simulation* simulation, const char* fileName) {
+Simulation* recreate_simulation() {
+    printf("------Obnovenie simulacie-----\n");
 
+    Simulation* simulation = (Simulation*)malloc(sizeof(Simulation));
+    simulation->world_ = (World*)malloc(sizeof(World));
+
+    printf("Zadajte subor, z ktoreho ma byt simulacia nacitana: ");
+    char inputFileName[100];
+    scanf("%s", inputFileName);
+    printf("Zadajte pocet replikacii: ");
+    int numReplications;
+    scanf("%d", &numReplications);
+    printf("Zadajte subor, do ktoreho sa ma replikacia ulozit: ");
+    char outputFileName[100];
+    scanf("%s", outputFileName);
+
+    simulation->numReplications_ = numReplications;
+    simulation->world_->outputFileName_ = strdup(outputFileName);
+    load_simulation_results(simulation, inputFileName);
+
+    return simulation;
+}
+
+void load_simulation_results(Simulation* simulation, const char* fileName) {
+    FILE* file = fopen(fileName, "r");
+
+    if (file == NULL) {
+        printf("Unable to open file %s\n", fileName);
+        return;
+    }
+
+    for (int i = 0; i < 4; i++) {
+        fscanf(file, "%f", &simulation->probabilities_[i]);
+    }
+
+    int width, height;
+    fscanf(file, "%d %d", &width, &height);
+    int K;
+    fscanf(file, "%d", &K);
+    char worldType[50];
+    fscanf(file, "%s", worldType);
+
+    simulation->world_->width_ = width;
+    simulation->world_->height_ = height;
+    simulation->K_ = K;
+    simulation->singlePlayer_ = true;
+    simulation->mode_ = INTERACTIVE_MODE;
+    simulation->world_->grid_ = (char**)malloc(height * sizeof(char*));
+    simulation->world_->pedestrian_ = create_pedestrian();
+
+    if (strcmp(worldType, "WORLD_EMPTY") == 0) {
+        simulation->world_->worldType_ = WORLD_EMPTY;
+    } else if (strcmp(worldType, "WORLD_OBSTACLES_FILE") == 0) {
+        simulation->world_->worldType_ = WORLD_OBSTACLES_FILE;
+    } else {
+        simulation->world_->worldType_ = WORLD_OBSTACLES_GENERATED;
+    }
+
+    calculate_center(simulation->world_);
+
+    for (int i = 0; i < height; i++) {
+        simulation->world_->grid_[i] = (char*)malloc(width * sizeof(char));
+    }
+
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            fscanf(file, " %c", &simulation->world_->grid_[i][j]);
+        }
+    }
+
+    fclose(file);
+}
+
+void save_simulation_results(Simulation* simulation, const char* fileName) {
+    FILE* file = fopen(fileName, "w");
+    if (file == NULL) {
+        printf("Nepodarilo sa otvorit subor na zapis: %s\n", fileName);
+        return;
+    }
+
+    for (int i = 0; i < 4; i++) {
+        fprintf(file, "%.4f", simulation->probabilities_[i]);
+        if (i < 3) {
+            fprintf(file, " ");
+        }
+    }
+    fprintf(file, "\n");
+
+    fprintf(file, "%d %d\n", simulation->world_->width_, simulation->world_->height_);
+    fprintf(file, "%d\n", simulation->K_);
+    fprintf(file, "%s\n", world_type_to_string(simulation->world_->worldType_));
+    
+    for (int i = 0; i < simulation->world_->height_; i++) {
+        for (int j = 0; j < simulation->world_->width_; j++) {
+            fprintf(file, "%c", simulation->world_->grid_[i][j]);
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
 }
 
 
@@ -152,9 +251,8 @@ char* choose_input_file() {
 
 char* choose_output_file() {
     printf("Zadajte nazov pre vystupny subor: ");
-    char* fileName;
-    scanf("%s", &fileName);
-
+    char* fileName = (char*)malloc(100 * sizeof(char)); 
+    scanf("%s", fileName);
     return fileName;
 }
 

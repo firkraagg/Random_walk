@@ -81,6 +81,23 @@ void print_world_summary(World* world, SimulationMode mode) {
     printf("\n");
 }
 
+void reinitialize_world_pedestrian(World* world) {
+    for (size_t i = 0; i < world->height_; i++)
+    {
+        for (size_t j = 0; j < world->width_; j++)
+        {
+            if (world->grid_[i][j] != 'O')
+            {
+                world->grid_[i][j] = '.';
+            }
+            if (j == world->pedestrian_->x_ && i == world->pedestrian_->y_)
+            {
+                world->grid_[i][j] = 'C';
+            }
+        }
+    }
+}
+
 void free_world(World* world) {
     if (world->stepsGrid_ != NULL) {
         for (size_t i = 0; i < world->height_; i++) {
@@ -97,6 +114,8 @@ void free_world(World* world) {
 
         free(world->probabilityGrid_);
     }
+
+    free(world->outputFileName_);
 }
 
 int read_world_from_file(World* world) {
@@ -167,6 +186,15 @@ void generate_world(World* world) {
 
     initialize_position(world);
     world->grid_[world->pedestrian_->y_][world->pedestrian_->x_] = 'C';
+}
+
+const char* world_type_to_string(WorldType worldType) {
+    switch (worldType) {
+        case WORLD_EMPTY: return "WORLD_EMPTY";
+        case WORLD_OBSTACLES_FILE: return "WORLD_OBSTACLES_FILE";
+        case WORLD_OBSTACLES_GENERATED: return "WORLD_OBSTACLES_GENERATED";
+        default: return "UNKNOWN";
+    }
 }
 
 double calculate_expected_steps(int x, int y, int midX, int midY, double probabilities[4]) {

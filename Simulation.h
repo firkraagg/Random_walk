@@ -20,7 +20,6 @@ typedef struct Simulation {
     int numReplications_;
     float probabilities_[4];
     int K_;
-    char* outputFileName_;
     SimulationMode mode_;
     bool singlePlayer_;
     World* world_;
@@ -29,6 +28,8 @@ typedef struct Simulation {
 Simulation* create_simulation();
 void run_simulation(Simulation* simulation);
 void save_simulation_results(Simulation* simulation, const char* fileName);
+void load_simulation_results(Simulation* simulation, const char* fileName);
+Simulation* recreate_simulation();
 void free_simulation(Simulation* simulation);
 
 float* choose_probabilities();

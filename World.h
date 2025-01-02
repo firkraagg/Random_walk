@@ -23,6 +23,7 @@ typedef struct World {
     int** stepsGrid_;
     double** probabilityGrid_;
     char* inputFileName_;
+    char* outputFileName_;
     WorldType worldType_;
     Pedestrian* pedestrian_;
 } World;
@@ -30,7 +31,9 @@ typedef struct World {
 void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode, WorldType worldType, int width, int height, int K, float probabilities[4]);
 void print_world(World* world);
 void print_world_summary(World* world, SimulationMode mode);
+void reinitialize_world_pedestrian(World* world);
 int read_world_from_file(World* world);
+const char* world_type_to_string(WorldType worldType);
 void calculate_center(World* world);
 double calculate_expected_steps(int x, int y, int midX, int midY, double probabilities[4]);
 double calculate_probability_to_center(int x, int y, int midX, int midY, int K, double probabilities[4]);

@@ -21,5 +21,6 @@ void initialize_position(World* world);
 int random_start_x(World* world);
 int random_start_y(World* world);
 void move_pedestrian(World* world, float probabilities[4]);
+void starting_position(World* World, int* x, int* y);
 
 #endif //PEDESTRIAN_H
