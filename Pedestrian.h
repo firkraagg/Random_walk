@@ -15,7 +15,6 @@ typedef struct Pedestrian {
     int y_;
 } Pedestrian;
 
-Pedestrian* create_pedestrian();
 void free_pedestrian(Pedestrian* pedestrian);
 void initialize_position(World* world);
 int random_start_x(World* world);

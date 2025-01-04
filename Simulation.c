@@ -1,33 +1,69 @@
 #include "Simulation.h"
 
-Simulation* create_simulation() {
-    Simulation* sim = (Simulation*)malloc(sizeof(Simulation));
+void create_simulation(SimulationInputs* sp, Simulation* sim) {
     sim->world_ = (World*)malloc(sizeof(World));
-    sim->world_->pedestrian_ = create_pedestrian();
-    printf("-----------Vytvaranie simulacie-----------\n");
-    sim->singlePlayer_ = choose_player_mode();
-    choose_world_type(sim->world_);
-    sim->mode_ = choose_mode(sim);
-    sim->numReplications_ = choose_number_of_replications();
-    sim->K_ = number_of_steps();
-    memcpy(sim->probabilities_, choose_probabilities(), sizeof(sim->probabilities_));
-    sim->world_->outputFileName_ = choose_output_file();
-    return sim;
+    sim->world_->pedestrian_ = (Pedestrian*)malloc(sizeof(Pedestrian));
+    sim->world_->width_ = sp->worldWidth;
+    sim->world_->height_ = sp->worldHeight;
+    sim->singlePlayer_ =sp->singlePlayer;
+    switch (sp->worldType)
+    {
+    case 0:
+        sim->world_->worldType_ = WORLD_EMPTY;
+        break;
+    case 1:
+        sim->world_->worldType_ = WORLD_OBSTACLES_GENERATED;
+        break;
+
+    case 2:
+        sim->world_->worldType_ = WORLD_OBSTACLES_FILE;
+        break;
+    
+    default:
+        break;
+    }
+
+    sim->mode_ = sp->mode;
+    sim->numReplications_ = sp->numReplications;
+    sim->K_ = sp->K;
+    memcpy(sim->probabilities_, sp->probabilities, sizeof(sim->probabilities_));
+    sim->world_->inputFileName_ = sp->inputFileName;
+    sim->world_->outputFileName_ = sp->outputFileName;
+}
+
+SimulationInputs* input_from_user() {
+    SimulationInputs* sp = (SimulationInputs*)malloc(sizeof(SimulationInputs));
+    sp->singlePlayer = choose_player_mode();
+    sp->worldType = choose_world_type();
+    sp->worldWidth = 0;
+    sp->worldHeight = 0;
+    memset(sp->inputFileName, 0, sizeof(sp->inputFileName));
+    memset(sp->outputFileName, 0, sizeof(sp->outputFileName));
+    if (sp->worldType == 2)
+    {
+        strncpy(sp->inputFileName, choose_input_file(), sizeof(sp->inputFileName) - 1);
+    } else {
+        get_size(&sp->worldWidth, &sp->worldHeight);
+    }
+    
+    sp->mode = choose_mode();
+    sp->numReplications = choose_number_of_replications();
+    sp->K = number_of_steps();
+    memcpy(sp->probabilities, choose_probabilities(), sizeof(sp->probabilities));
+    strncpy(sp->outputFileName, choose_output_file(), sizeof(sp->outputFileName) - 1);
+    return sp;
 }
 
 void run_simulation(Simulation* simulation) {
+    printf("========== SIMULÁCIA ==========\n");
     initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
-    if (simulation->world_->worldType_ != WORLD_OBSTACLES_FILE)
-    {
-        initialize_position(simulation->world_);
-    }
 
     if (simulation->mode_ == INTERACTIVE_MODE)
     {
         for (size_t i = 0; i < simulation->numReplications_; i++)
         {
-            printf("Cislo aktualnej replikacie: %d\n", i + 1);
-            printf("Celkovy pocet replikacii: %d\n", simulation->numReplications_);
+            printf(">>> Replikacia: %d / %d <<<\n", i + 1, simulation->numReplications_);
+            printf("\n\tSvet:\n");
             starting_position(simulation->world_, &simulation->world_->pedestrian_->x_, &simulation->world_->pedestrian_->y_);
             initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
             for (size_t j = 0; j < simulation->K_; j++)
@@ -38,31 +74,51 @@ void run_simulation(Simulation* simulation) {
 
                 fflush(stdin);
             }
+            if (i + 1 != simulation->numReplications_) {
+                printf("-------------------------------\n");
+            }
         }
     } else if (simulation->mode_ == SUMMARY_MODE_WITHOUT_K || simulation->mode_ == SUMMARY_MODE_WITH_K) {
         print_world_summary(simulation->world_, simulation->mode_);
     }
 
     save_simulation_results(simulation, simulation->world_->outputFileName_);
-    free_world(simulation->world_);
-    free_pedestrian(simulation->world_->pedestrian_);
+
+    if (simulation->world_)
+    {
+        free_world(simulation->world_);
+    }
+    
+    if (simulation->world_->pedestrian_) {
+        free_pedestrian(simulation->world_->pedestrian_);
+    }
+
+    printf("========== KONIEC SIMULÁCIE ==========\n\n");
 }
 
 Simulation* recreate_simulation() {
-    printf("------Obnovenie simulacie-----\n");
+    printf("======== OBNOVENIE SIMULACIE =========\n");
 
     Simulation* simulation = (Simulation*)malloc(sizeof(Simulation));
     simulation->world_ = (World*)malloc(sizeof(World));
 
-    printf("Zadajte subor, z ktoreho ma byt simulacia nacitana: ");
+    printf(">>> Zadajte nazov suboru, z ktoreho ma byt simulacia nacitana <<<\n");
+    printf("- Nazov: ");
     char inputFileName[100];
     scanf("%s", inputFileName);
-    printf("Zadajte pocet replikacii: ");
+    printf("\n");
+
+    printf(">>> Zadajte pocet replikacii<<<\n");
+    printf("- Pocet: ");
     int numReplications;
     scanf("%d", &numReplications);
-    printf("Zadajte subor, do ktoreho sa ma replikacia ulozit: ");
+    printf("\n");
+
+    printf(">>> Zadajte nazov suboru, do ktoreho sa maju vysledky ulozit <<<\n");
+    printf("- Nazov: ");
     char outputFileName[100];
     scanf("%s", outputFileName);
+    printf("\n");
 
     simulation->numReplications_ = numReplications;
     simulation->world_->outputFileName_ = strdup(outputFileName);
@@ -75,7 +131,7 @@ void load_simulation_results(Simulation* simulation, const char* fileName) {
     FILE* file = fopen(fileName, "r");
 
     if (file == NULL) {
-        printf("Unable to open file %s\n", fileName);
+        printf("Nebolo mozne otvorit subor s nazvom: %s\n", fileName);
         return;
     }
 
@@ -96,7 +152,7 @@ void load_simulation_results(Simulation* simulation, const char* fileName) {
     simulation->singlePlayer_ = true;
     simulation->mode_ = INTERACTIVE_MODE;
     simulation->world_->grid_ = (char**)malloc(height * sizeof(char*));
-    simulation->world_->pedestrian_ = create_pedestrian();
+    simulation->world_->pedestrian_ = (Pedestrian*)malloc(sizeof(Pedestrian));
 
     if (strcmp(worldType, "WORLD_EMPTY") == 0) {
         simulation->world_->worldType_ = WORLD_EMPTY;
@@ -115,6 +171,13 @@ void load_simulation_results(Simulation* simulation, const char* fileName) {
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             fscanf(file, " %c", &simulation->world_->grid_[i][j]);
+
+            if (simulation->world_->grid_[i][j] == 'C') {
+                simulation->world_->pedestrian_->x_ = j;
+                simulation->world_->pedestrian_->y_ = i;
+                simulation->world_->pedestrian_->startX_ = j;
+                simulation->world_->pedestrian_->startY_ = i;
+            }
         }
     }
 
@@ -152,116 +215,117 @@ void save_simulation_results(Simulation* simulation, const char* fileName) {
 
 
 float* choose_probabilities() {
-    printf("Zadajte pravdepodobnosti pre pohyb chodca (Pravdepodobnost vsetkych 4 svetovych stran sa musia rovnat 1!):\n");
+    printf(">>> Nastavte pravdepodobnosti pre pohyb chodca <<<\n");
+    printf("(Vsetky hodnoty spolu musia byt rovne 1.0:)\n");
     
     float* array = (float*)malloc(4 * sizeof(float));
+    float sum;
     do {
-        printf("1. Pohyb dolava: ");
+        printf("- Pohyb dolava: ");
         scanf("%f", &array[0]);
     
-        printf("1. Pohyb doprava: ");
+        printf("- Pohyb doprava: ");
         scanf("%f", &array[1]);
 
-        printf("1. Pohyb hore: ");
+        printf("- Pohyb hore: ");
         scanf("%f", &array[2]);
 
-        printf("1. Pohyb dole: ");
+        printf("- Pohyb dole: ");
         scanf("%f", &array[3]);
 
-        if (array[0] + array[1] + array[2] + array[3] != 1.0f) {
-            printf("Chyba: Sucet pravdepodobnosti musi byt 1. Skuste to znova.\n");
+        sum = array[0] + array[1] + array[2] + array[3];
+
+        if (fabs(sum - 1.0f) > 1e-6) {
+            printf("Chyba: Sucet pravdepodobnosti musi byt 1.0. Skuste to znova.\n");
         }
-    } while (array[0] + array[1] + array[2] + array[3] != 1.0f);
+    } while (fabs(sum - 1.0f) > 1e-6);
     
+    printf("\n");
     return array;
 }
 
 int choose_number_of_replications() {
-    printf("Zadajte pocet replikacii: ");
+    printf(">>> Nastavte pocet replikacii <<<\n");
+    printf("- Pocet replikacii: ");
     int numReplications;
     scanf("%d", &numReplications);
+    printf("\n");
 
     return numReplications;
 }
 
-void choose_world_type(World* world) {
-    printf("Vyberte si typ sveta:\n");
+int choose_world_type() {
+    printf("========== TYP SVETA ==========\n");
     printf("1. Svet bez prekazok\n");
     printf("2. Svet s prekazkami\n");
+    printf("===============================\n");
+    printf("Vyberte typ sveta: ");
     int result;
     scanf("%d", &result);
-
+    printf("\n");
     switch (result)
     {
     case 1:
-        get_size(world);
-        world->worldType_ = WORLD_EMPTY;
-        break;
-    
-    case 2:
-        choose_world_with_obstacles(world);
-        break;
+        return 0;
     
     default:
-        world->worldType_ = WORLD_EMPTY;
+        return choose_world_with_obstacles();
         break;
     }
+    return result;
 }
 
-void choose_world_with_obstacles(World* world) {
-    printf("Vyber si, ako chces vytvorit svet:\n");
-    printf("1. Nahodnou generaciou sveta\n");
-    printf("2. Nacitanim zo suboru\n");
+int choose_world_with_obstacles() {
+    printf("======= MOZNOSTI VYTVORENIA SVETA =======\n");
+    printf("1. Nahodna generacia\n");
+    printf("2. Nacitane zo suboru\n");
+    printf("=========================================\n");
+    printf("Vyberte moznost: ");
 
     int result;
     scanf("%d", &result);
-    switch (result)
-    {
-    case 1:
-        get_size(world);
-        generate_world(world);
-        world->worldType_ = WORLD_OBSTACLES_GENERATED;
-        break;
-
-    case 2:
-        world->inputFileName_ = choose_input_file();
-        read_world_from_file(world);
-        world->worldType_ = WORLD_OBSTACLES_FILE;
-        break;
-    
-    default:
-        break;
-    }
+    printf("\n");
+    return result;
 }
 
-void get_size(World* world) {
-    printf("Zadaj pocet riadkov: ");
-    scanf("%d", &world->width_);
-    printf("Zadaj pocet stlpcov: ");
-    scanf("%d", &world->height_);
+void get_size(int* x, int* y) {
+    printf(">>> Zadajte rozmery sveta <<<\n");
+    printf("- Pocet riadkov: ");
+    scanf("%d", x);
+    printf("- Pocet stlpcov: ");
+    scanf("%d", y);
+    printf("\n");
 }
 
 char* choose_input_file() {
-    printf("Zadajte nazov pre vstupny subor: ");
+    printf(">>> Zadajte nazov vstupneho suboru <<<\n");
+    printf("- Nazov: ");
     char* fileName = malloc(100 * sizeof(char));
     scanf("%99s", fileName);
+    printf("\n");
 
     return fileName;
 }
 
 char* choose_output_file() {
-    printf("Zadajte nazov pre vystupny subor: ");
+    printf(">>> Zadajte nazov vystupneho suboru <<<\n");
+    printf("- Nazov: ");
     char* fileName = (char*)malloc(100 * sizeof(char)); 
     scanf("%s", fileName);
+    printf("\n");
+
     return fileName;
 }
 
 bool choose_player_mode() {
-    printf("Zvolte rezim pre vasu simulaciu:\n");
+    printf("========= REZIM SIMULACIE ==========\n");
     printf("1. Rezim pre jedneho hraca\n");
     printf("2. Rezim pre viac hracov (nefunkcny)\n");
+    printf("====================================\n");
+    printf("Vyberte rezim: ");
     int result;
     scanf("%d", &result);
+    printf("\n");
     switch (result)
     {
     case 1:
@@ -276,20 +340,25 @@ bool choose_player_mode() {
 }
 
 int number_of_steps() {
-    printf("Napiste maximalny pocet krokov: ");
+    printf(">>> Zadajte maximalny pocet krokov <<<\n");
+    printf("- Pocet krokov: ");
     int numberOfSteps;
     scanf("%d", &numberOfSteps);
+    printf("\n");
 
     return numberOfSteps;
 }
 
-SimulationMode choose_mode(Simulation* sim) {
-    printf("Zvolte si mod pre simulaciu:\n");
+SimulationMode choose_mode() {
+    printf("=========== MOD SIMULACIE ============\n");
     printf("1. Interaktivny\n");
-    printf("2. Sumarny s priemernym poctom posunov\n");
-    printf("3. Sumarny s pravdepodobnostou dosiahnutia stredu s najviac K posunmi\n");
+    printf("2. Sumarny (priemerny pocet posunov)\n");
+    printf("3. Sumarny (pravdepodobnost dosiahnutia stredu s najviac K posunmi)\n");
+    printf("======================================\n");
+    printf("Zvolte mod: ");
     int choice;
     scanf("%d", &choice);
+    printf("\n");
     switch (choice)
     {
     case 1:
@@ -307,8 +376,19 @@ SimulationMode choose_mode(Simulation* sim) {
 }
 
 void free_simulation(Simulation* simulation) {
-    if (simulation)
-    {
-        free(simulation);
+    if (simulation == NULL) return;
+    if (simulation->world_) {
+        if (simulation->world_->grid_) {
+            for (int i = 0; i < simulation->world_->height_; i++) {
+                free(simulation->world_->grid_[i]);
+            }
+            free(simulation->world_->grid_);
+        }
+        if (simulation->world_->outputFileName_) {
+            free(simulation->world_->outputFileName_);
+        }
+        free(simulation->world_->pedestrian_);
+        free(simulation->world_);
     }
+    free(simulation);
 }

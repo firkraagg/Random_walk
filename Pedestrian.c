@@ -1,10 +1,5 @@
 #include "Pedestrian.h"
 
-Pedestrian* create_pedestrian() {
-    Pedestrian* pedestrian = (Pedestrian*)malloc(sizeof(Pedestrian));
-    return pedestrian;
-}
-
 void free_pedestrian(Pedestrian* pedestrian) {
     if (pedestrian != NULL)
     {
@@ -50,7 +45,7 @@ void initialize_position(World* world) {
     generate_random_coordinates(world, &world->pedestrian_->startX_, &world->pedestrian_->startY_);
     world->pedestrian_->x_ = world->pedestrian_->startX_;
     world->pedestrian_->y_ = world->pedestrian_->startY_;
-    reinitialize_world_pedestrian(world);
+    //reinitialize_world_pedestrian(world);
 }
 
 void starting_position(World* world, int* x, int* y) {

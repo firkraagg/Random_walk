@@ -6,15 +6,31 @@
 #include <stdbool.h>
 #include <string.h>
 #include <windows.h>
+#include <math.h>
 #include "Pedestrian.h"
 
+
 typedef struct World World;
+typedef enum WorldType WorldType;
 
 typedef enum SimulationMode {
     INTERACTIVE_MODE,
     SUMMARY_MODE_WITH_K,
     SUMMARY_MODE_WITHOUT_K
 }   SimulationMode;
+
+typedef struct SimulationInputs {
+    bool singlePlayer;
+    int numReplications;
+    int K;
+    float probabilities[4];
+    char outputFileName[256];
+    int worldType;
+    int worldWidth;
+    int worldHeight;
+    char inputFileName[256];
+    SimulationMode mode;
+} SimulationInputs;
 
 typedef struct Simulation {
     int numReplications_;
@@ -25,7 +41,8 @@ typedef struct Simulation {
     World* world_;
 } Simulation;
 
-Simulation* create_simulation();
+void create_simulation(SimulationInputs* sp, Simulation* sim);
+SimulationInputs* input_from_user();
 void run_simulation(Simulation* simulation);
 void save_simulation_results(Simulation* simulation, const char* fileName);
 void load_simulation_results(Simulation* simulation, const char* fileName);
@@ -34,13 +51,13 @@ void free_simulation(Simulation* simulation);
 
 float* choose_probabilities();
 int choose_number_of_replications();
-void choose_world_type(World* world);
+int choose_world_type();
+int choose_world_with_obstacles();
 char* choose_input_file();
 char* choose_output_file();
-void choose_world_with_obstacles(World* world);
 bool choose_player_mode();
 int number_of_steps();
 SimulationMode choose_mode();
-void get_size(World* world);
+void get_size(int* x, int* y);
 
 #endif //SIMULATION_H

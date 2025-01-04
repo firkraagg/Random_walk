@@ -10,8 +10,8 @@ typedef enum SimulationMode SimulationMode;
 
 typedef enum WorldType {
     WORLD_EMPTY,
-    WORLD_OBSTACLES_FILE,
-    WORLD_OBSTACLES_GENERATED
+    WORLD_OBSTACLES_GENERATED,
+    WORLD_OBSTACLES_FILE
 } WorldType;
 
 typedef struct World {
