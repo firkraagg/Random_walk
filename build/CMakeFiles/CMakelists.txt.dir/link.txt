@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/CMakelists.txt.dir/Menu.c.o CMakeFiles/CMakelists.txt.dir/Pedestrian.c.o CMakeFiles/CMakelists.txt.dir/Simulation.c.o CMakeFiles/CMakelists.txt.dir/World.c.o CMakeFiles/CMakelists.txt.dir/client.c.o CMakeFiles/CMakelists.txt.dir/main.c.o CMakeFiles/CMakelists.txt.dir/server.c.o -o CMakelists.txt 

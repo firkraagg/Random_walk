@@ -2,7 +2,6 @@
 
 void create_simulation(SimulationInputs* sp, Simulation* sim) {
     sim->world_ = (World*)malloc(sizeof(World));
-    sim->world_->pedestrian_ = (Pedestrian*)malloc(sizeof(Pedestrian));
     sim->world_->width_ = sp->worldWidth;
     sim->world_->height_ = sp->worldHeight;
     sim->singlePlayer_ =sp->singlePlayer;
@@ -41,7 +40,9 @@ SimulationInputs* input_from_user() {
     memset(sp->outputFileName, 0, sizeof(sp->outputFileName));
     if (sp->worldType == 2)
     {
-        strncpy(sp->inputFileName, choose_input_file(), sizeof(sp->inputFileName) - 1);
+        char* inputFileName = choose_input_file();
+        strncpy(sp->inputFileName, inputFileName, sizeof(sp->inputFileName) - 1);
+        free(inputFileName);    
     } else {
         get_size(&sp->worldWidth, &sp->worldHeight);
     }
@@ -49,51 +50,95 @@ SimulationInputs* input_from_user() {
     sp->mode = choose_mode();
     sp->numReplications = choose_number_of_replications();
     sp->K = number_of_steps();
-    memcpy(sp->probabilities, choose_probabilities(), sizeof(sp->probabilities));
-    strncpy(sp->outputFileName, choose_output_file(), sizeof(sp->outputFileName) - 1);
+    float* probabilities = choose_probabilities();
+    memcpy(sp->probabilities, probabilities, sizeof(sp->probabilities));
+    free(probabilities);
+    char* outputFileName = choose_output_file();
+    strncpy(sp->outputFileName, outputFileName, sizeof(sp->outputFileName) - 1);
+    free(outputFileName);
     return sp;
 }
 
-void run_simulation(Simulation* simulation) {
+void run_simulation(Simulation* simulation, int client_socket) {
     printf("========== SIMULÁCIA ==========\n");
-    initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
-
-    if (simulation->mode_ == INTERACTIVE_MODE)
-    {
-        for (size_t i = 0; i < simulation->numReplications_; i++)
-        {
-            printf(">>> Replikacia: %d / %d <<<\n", i + 1, simulation->numReplications_);
-            printf("\n\tSvet:\n");
-            starting_position(simulation->world_, &simulation->world_->pedestrian_->x_, &simulation->world_->pedestrian_->y_);
-            initialize_world(simulation->world_, simulation->world_->pedestrian_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
-            for (size_t j = 0; j < simulation->K_; j++)
-            {
-                Sleep(1500);
-                print_world(simulation->world_);
-                move_pedestrian(simulation->world_, simulation->probabilities_);
-
-                fflush(stdin);
-            }
-            if (i + 1 != simulation->numReplications_) {
-                printf("-------------------------------\n");
-            }
+    initialize_simulation(simulation);
+    if (simulation->mode_ == INTERACTIVE_MODE) {
+        for (size_t i = 0; i < simulation->numReplications_; i++) {
+            perform_replication(simulation, client_socket, i);
         }
     } else if (simulation->mode_ == SUMMARY_MODE_WITHOUT_K || simulation->mode_ == SUMMARY_MODE_WITH_K) {
         print_world_summary(simulation->world_, simulation->mode_);
     }
 
+    finalize_simulation(simulation, client_socket);
+}
+
+void initialize_simulation(Simulation* simulation) {
+    initialize_world(simulation->world_, simulation->mode_, simulation->world_->worldType_, simulation->world_->width_, simulation->world_->height_, simulation->K_, simulation->probabilities_);
+}
+
+void perform_replication(Simulation* simulation, int client_socket, size_t replication_index) {
+    starting_position(simulation->world_, &simulation->world_->pedestrian_->x_, &simulation->world_->pedestrian_->y_);
+    reset_world(simulation->world_);
+    for (size_t j = 0; j < simulation->K_; j++) {
+        if (j == 0) {
+            printf(">>> Replikacia: %d / %d <<<\n", (int)replication_index + 1, simulation->numReplications_);
+            printf("\n\tSvet:\n");
+        }
+        sleep(1);
+        send_world(client_socket, simulation->world_);
+        move_pedestrian(simulation->world_, simulation->probabilities_);
+        fflush(stdin);
+
+        char ack;
+        if (recv(client_socket, &ack, sizeof(ack), 0) == -1) {
+            perror("Chyba pri prijimani potvrdenia");
+            return;
+        }
+        if (ack != 'A') {
+            fprintf(stderr, "Necakane potvrdenie: %c\n", ack);
+            return;
+        }
+    }
+    if (replication_index + 1 != simulation->numReplications_) {
+        printf("-------------------------------\n");
+    }
+}
+
+void finalize_simulation(Simulation* simulation, int client_socket) {
     save_simulation_results(simulation, simulation->world_->outputFileName_);
 
-    if (simulation->world_)
-    {
-        free_world(simulation->world_);
-    }
-    
-    if (simulation->world_->pedestrian_) {
-        free_pedestrian(simulation->world_->pedestrian_);
-    }
+    char end_signal = 'E';
+    send(client_socket, &end_signal, sizeof(end_signal), 0);
 
     printf("========== KONIEC SIMULÁCIE ==========\n\n");
+}
+
+void send_world(int client_socket, World* world) {
+    char start_signal = 'S';
+    if (send(client_socket, &start_signal, sizeof(start_signal), 0) == -1) {
+        perror("Problem zo zaslanim startovacieho signalu");
+        return;
+    }
+
+    int num_rows = world->height_;
+    if (send(client_socket, &num_rows, sizeof(num_rows), 0) == -1) {
+        perror("Problem s odoslanim poctu riadkov");
+        return;
+    }
+
+    for (int i = 0; i < num_rows; i++) {
+        if (send(client_socket, world->grid_[i], world->width_ * sizeof(char), 0) == -1) {
+            perror("Problem so zaslanim riadka");
+            return;
+        }
+
+        char ack;
+        if (recv(client_socket, &ack, sizeof(ack), 0) == -1) {
+            perror("Problem s prijatim potvrdenia");
+            return;
+        }
+    }
 }
 
 Simulation* recreate_simulation() {
@@ -384,10 +429,36 @@ void free_simulation(Simulation* simulation) {
             }
             free(simulation->world_->grid_);
         }
+        if (simulation->world_->initial_grid_) {
+            for (int i = 0; i < simulation->world_->height_; i++) {
+                free(simulation->world_->initial_grid_[i]);
+            }
+            free(simulation->world_->initial_grid_);
+        }
+        if (simulation->world_->stepsGrid_) {
+            for (int i = 0; i < simulation->world_->height_; i++) {
+                free(simulation->world_->stepsGrid_[i]);
+            }
+            free(simulation->world_->stepsGrid_);
+        }
+        if (simulation->world_->probabilityGrid_) {
+            for (int i = 0; i < simulation->world_->height_; i++) {
+                free(simulation->world_->probabilityGrid_[i]);
+            }
+            free(simulation->world_->probabilityGrid_);
+        }
+        if (simulation->world_->inputFileName_) {
+            free(simulation->world_->inputFileName_);
+        }
         if (simulation->world_->outputFileName_) {
             free(simulation->world_->outputFileName_);
         }
-        free(simulation->world_->pedestrian_);
+        if (simulation->world_->pedestrian_) {
+            free(simulation->world_->pedestrian_);
+        }
+        if (simulation->world_->initial_pedestrian_) {
+            free(simulation->world_->initial_pedestrian_);
+        }
         free(simulation->world_);
     }
     free(simulation);

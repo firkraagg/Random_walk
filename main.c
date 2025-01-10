@@ -1,13 +1,9 @@
-#include "Menu.h"
+#include "client.h"
+#include "server.h"
 #include <time.h>
 
 int main(int argc, char** argv) {
     srand(time(NULL));
-
-    display_menu();
-    int number;
-    scanf("%d", &number);
-    handle_menu_option(number);
-
+    start_client();
     return 0;
 }
