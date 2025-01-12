@@ -3,55 +3,96 @@
 void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode, WorldType worldType, int width, int height, int K, float probabilities[4]) {
     world->width_ = width;
     world->height_ = height;
-    world->grid_ = (char**)malloc(height * sizeof(char*));
-    //world->pedestrian_ = pedestrian;
     world->worldType_ = worldType;
-    calculate_center(world);
-
-    double probabilities_double[4];
-    for (int i = 0; i < 4; i++) {
-        probabilities_double[i] = (double)probabilities[i];
-    }
-
-    if (mode == INTERACTIVE_MODE && world->worldType_ == WORLD_OBSTACLES_FILE) {
-        read_world_from_file(world);
-    } else {
-        for (size_t i = 0; i < height; i++){
-            world->grid_[i] = (char*)malloc(width * sizeof(char));
-            if (mode == INTERACTIVE_MODE && world->worldType_ == WORLD_OBSTACLES_GENERATED) { 
-                    generate_world(world);
-            }
-            for (size_t j = 0; j < width; j++)
-            {
-                if (mode == INTERACTIVE_MODE && world->worldType_ == WORLD_EMPTY) {
-                    world->grid_[i][j] = '.';
-                } else if (mode == SUMMARY_MODE_WITHOUT_K) {
-                    world->stepsGrid_ = (int**)malloc(height * sizeof(int*));
-                    for (size_t i = 0; i < height; i++) {
-                        world->stepsGrid_[i] = (int*)malloc(width * sizeof(int));
-                        for (size_t j = 0; j < width; j++) {
-                            world->stepsGrid_[i][j] = calculate_expected_steps(j, i, world->midX_, world->midY_, probabilities_double);
-                        }
-                    }
-                } else if (mode == SUMMARY_MODE_WITH_K) {
-                    world->probabilityGrid_ = (double**)malloc(height * sizeof(double*));
-                    for (size_t i = 0; i < height; i++) {
-                        world->probabilityGrid_[i] = (double*)malloc(width * sizeof(double));
-                        for (size_t j = 0; j < width; j++) {
-                            world->probabilityGrid_[i][j] = calculate_probability_to_center(j, i, K, world->midX_, world->midY_, probabilities_double);
-                        }
-                    }
-                }
-            }
-        }
+    if (world->worldType_ != WORLD_OBSTACLES_FILE) {
+        calculate_center(world);
+        allocate_grid(world, height, width);
+        initialize_probabilities(probabilities, world->probabilities_);
     }
     
+    if (mode == INTERACTIVE_MODE && world->worldType_ == WORLD_OBSTACLES_FILE) {
+        read_world_from_file(world);
+        calculate_center(world);
+    } else {
+        initialize_grid(world, mode, worldType, height, width, K);
+    }
+
     if (world->pedestrian_ == NULL && world->worldType_ != WORLD_OBSTACLES_FILE) {
         world->pedestrian_ = (Pedestrian*)malloc(sizeof(Pedestrian));
         initialize_position(world);
     }
 
     reinitialize_world_pedestrian(world);
+    save_initial_state(world);
+}
+
+void save_initial_state(World* world) {
+    world->initial_grid_ = (char**)malloc(world->height_ * sizeof(char*));
+    for (int i = 0; i < world->height_; i++) {
+        world->initial_grid_[i] = (char*)malloc(world->width_ * sizeof(char));
+        memcpy(world->initial_grid_[i], world->grid_[i], world->width_ * sizeof(char));
+    }
+
+    world->initial_pedestrian_ = (Pedestrian*)malloc(sizeof(Pedestrian));
+    memcpy(world->initial_pedestrian_, world->pedestrian_, sizeof(Pedestrian));
+}
+
+void reset_world(World* world) {
+    for (int i = 0; i < world->height_; i++) {
+        memcpy(world->grid_[i], world->initial_grid_[i], world->width_ * sizeof(char));
+    }
+    memcpy(world->pedestrian_, world->initial_pedestrian_, sizeof(Pedestrian));
+    reinitialize_world_pedestrian(world);
+}
+
+void allocate_grid(World* world, int height, int width) {
+    world->grid_ = (char**)malloc(height * sizeof(char*));
+    for (int i = 0; i < height; i++) {
+        world->grid_[i] = (char*)malloc(width * sizeof(char));
+    }
+}
+
+void initialize_grid(World* world, SimulationMode mode, WorldType worldType, int height, int width, int K) {
+    if (mode == INTERACTIVE_MODE && worldType == WORLD_OBSTACLES_GENERATED) {
+        generate_world(world);
+    }
+    for (size_t i = 0; i < height; i++) {
+        for (size_t j = 0; j < width; j++) {
+            if (mode == INTERACTIVE_MODE && worldType == WORLD_EMPTY) {
+                world->grid_[i][j] = '.';
+            } else if (mode == SUMMARY_MODE_WITHOUT_K) {
+                initialize_steps_grid(world, height, width);
+            } else if (mode == SUMMARY_MODE_WITH_K) {
+                initialize_probability_grid(world, height, width, K);
+            }
+        }
+    }
+}
+
+void initialize_probabilities(float probabilities[4], double probabilities_double[4]) {
+    for (size_t i = 0; i < 4; i++) {
+        probabilities_double[i] = probabilities[i];
+    }
+}
+
+void initialize_steps_grid(World* world, int height, int width) {
+    world->stepsGrid_ = (int**)malloc(height * sizeof(int*));
+    for (size_t i = 0; i < height; i++) {
+        world->stepsGrid_[i] = (int*)malloc(width * sizeof(int));
+        for (size_t j = 0; j < width; j++) {
+            world->stepsGrid_[i][j] = calculate_expected_steps(j, i, world->midX_, world->midY_, world->probabilities_);
+        }
+    }
+}
+
+void initialize_probability_grid(World* world, int height, int width, int K) {
+    world->probabilityGrid_ = (double**)malloc(height * sizeof(double*));
+    for (size_t i = 0; i < height; i++) {
+        world->probabilityGrid_[i] = (double*)malloc(width * sizeof(double));
+        for (size_t j = 0; j < width; j++) {
+            world->probabilityGrid_[i][j] = calculate_probability_to_center(j, i, K, world->midX_, world->midY_, world->probabilities_);
+        }
+    }
 }
 
 void print_world(World* world) {
@@ -89,13 +130,20 @@ void reinitialize_world_pedestrian(World* world) {
     {
         for (size_t j = 0; j < world->width_; j++)
         {
-            if (world->grid_[i][j] != 'O')
+            if (world->grid_[i][j] != 'X')
             {
                 world->grid_[i][j] = '.';
             }
             if (j == world->pedestrian_->x_ && i == world->pedestrian_->y_)
             {
+                world->grid_[i][j] = '.';
+            }
+            if (j == world->pedestrian_->startX_ && i == world->pedestrian_->startY_)
+            {
                 world->grid_[i][j] = 'C';
+            }
+            if(j == world->midX_ && i == world->midY_) {
+                world->grid_[i][j] = 'S';
             }
         }
     }
@@ -106,7 +154,6 @@ void free_world(World* world) {
         for (size_t i = 0; i < world->height_; i++) {
             free(world->stepsGrid_[i]);
         }
-
         free(world->stepsGrid_);
     }
 
@@ -114,15 +161,43 @@ void free_world(World* world) {
         for (size_t i = 0; i < world->height_; i++) {
             free(world->probabilityGrid_[i]);
         }
-
         free(world->probabilityGrid_);
     }
 
-    free(world->outputFileName_);
+    if (world->grid_ != NULL) {
+        for (size_t i = 0; i < world->height_; i++) {
+            free(world->grid_[i]);
+        }
+        free(world->grid_);
+    }
+
+    if (world->initial_grid_ != NULL) {
+        for (size_t i = 0; i < world->height_; i++) {
+            free(world->initial_grid_[i]);
+        }
+        free(world->initial_grid_);
+    }
+
+    if (world->inputFileName_ != NULL) {
+        free(world->inputFileName_);
+    }
+
+    if (world->outputFileName_ != NULL) {
+        free(world->outputFileName_);
+    }
+
+    if (world->pedestrian_ != NULL) {
+        free(world->pedestrian_);
+    }
+
+    if (world->initial_pedestrian_ != NULL) {
+        free(world->initial_pedestrian_);
+    }
 }
 
 int read_world_from_file(World* world) {
     FILE* fptr = fopen(world->inputFileName_, "r");
+    printf("Nazov suboru: %s", world->inputFileName_);
     world->pedestrian_ = (Pedestrian*)malloc(sizeof(Pedestrian));
 
     if (fptr == NULL) {
@@ -181,15 +256,14 @@ void generate_world(World* world) {
         for (int j = 0; j < world->width_; j++) {
             double probability = (double)rand() / RAND_MAX;
             if (probability < 0.2 && i != world->midX_ && j != world->midY_) {
-                world->grid_[i][j] = 'O'; 
+                world->grid_[i][j] = 'X'; 
+            } else if(j == world->midX_ && i == world->midY_) {
+                world->grid_[i][j] = 'S';
             } else {
                 world->grid_[i][j] = '.';
             }
         }
     }
-
-    // initialize_position(world);
-    // world->grid_[world->pedestrian_->y_][world->pedestrian_->x_] = 'C';
 }
 
 const char* world_type_to_string(WorldType worldType) {
@@ -239,7 +313,6 @@ double calculate_probability_to_center(int x, int y, int K, int midX, int midY, 
 
     return probability;
 }
-
 
 void calculate_center(World* world) {
     world->midX_ = world->width_ / 2;

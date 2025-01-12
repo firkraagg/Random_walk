@@ -5,10 +5,11 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-#include <windows.h>
+#include <unistd.h>
+#include <netinet/in.h>
 #include <math.h>
+#include <sys/select.h>
 #include "Pedestrian.h"
-
 
 typedef struct World World;
 typedef enum WorldType WorldType;
@@ -39,14 +40,19 @@ typedef struct Simulation {
     SimulationMode mode_;
     bool singlePlayer_;
     World* world_;
+    int pedestrianMidCount_;
 } Simulation;
 
 void create_simulation(SimulationInputs* sp, Simulation* sim);
 SimulationInputs* input_from_user();
-void run_simulation(Simulation* simulation);
+void run_simulation(Simulation* simulation, int client_socket);
+void finalize_simulation(Simulation* simulation, int client_socket);
+void perform_replication(Simulation* simulation, int client_socket, size_t replication_index);
+void initialize_simulation(Simulation* simulation);
 void save_simulation_results(Simulation* simulation, const char* fileName);
 void load_simulation_results(Simulation* simulation, const char* fileName);
 Simulation* recreate_simulation();
+bool pedestrian_reaches_middle(World* world);
 void free_simulation(Simulation* simulation);
 
 float* choose_probabilities();

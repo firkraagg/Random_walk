@@ -1,0 +1,44 @@
+[
+{
+  "directory": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/build",
+  "command": "/usr/bin/cc   -g -o CMakeFiles/CMakelists.txt.dir/Menu.c.o -c /mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/Menu.c",
+  "file": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/Menu.c",
+  "output": "CMakeFiles/CMakelists.txt.dir/Menu.c.o"
+},
+{
+  "directory": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/build",
+  "command": "/usr/bin/cc   -g -o CMakeFiles/CMakelists.txt.dir/Pedestrian.c.o -c /mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/Pedestrian.c",
+  "file": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/Pedestrian.c",
+  "output": "CMakeFiles/CMakelists.txt.dir/Pedestrian.c.o"
+},
+{
+  "directory": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/build",
+  "command": "/usr/bin/cc   -g -o CMakeFiles/CMakelists.txt.dir/Simulation.c.o -c /mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/Simulation.c",
+  "file": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/Simulation.c",
+  "output": "CMakeFiles/CMakelists.txt.dir/Simulation.c.o"
+},
+{
+  "directory": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/build",
+  "command": "/usr/bin/cc   -g -o CMakeFiles/CMakelists.txt.dir/World.c.o -c /mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/World.c",
+  "file": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/World.c",
+  "output": "CMakeFiles/CMakelists.txt.dir/World.c.o"
+},
+{
+  "directory": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/build",
+  "command": "/usr/bin/cc   -g -o CMakeFiles/CMakelists.txt.dir/client.c.o -c /mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/client.c",
+  "file": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/client.c",
+  "output": "CMakeFiles/CMakelists.txt.dir/client.c.o"
+},
+{
+  "directory": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/build",
+  "command": "/usr/bin/cc   -g -o CMakeFiles/CMakelists.txt.dir/main.c.o -c /mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/main.c",
+  "file": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/main.c",
+  "output": "CMakeFiles/CMakelists.txt.dir/main.c.o"
+},
+{
+  "directory": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/build",
+  "command": "/usr/bin/cc   -g -o CMakeFiles/CMakelists.txt.dir/server.c.o -c /mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/server.c",
+  "file": "/mnt/c/Users/danzu/Onedrive/Počítač/POS_SP/server.c",
+  "output": "CMakeFiles/CMakelists.txt.dir/server.c.o"
+}
+]

@@ -24,7 +24,7 @@ void move_pedestrian(World* world, float probabilities[4]) {
         world->pedestrian_->y_ = (world->pedestrian_->y_ + 1) % world->height_;
     }
 
-    if (world->grid_[world->pedestrian_->y_][world->pedestrian_->x_] == 'O') {
+    if (world->grid_[world->pedestrian_->y_][world->pedestrian_->x_] == 'X') {
         world->pedestrian_->x_ = oldX;
         world->pedestrian_->y_ = oldY;
         move_pedestrian(world, probabilities);
@@ -45,7 +45,6 @@ void initialize_position(World* world) {
     generate_random_coordinates(world, &world->pedestrian_->startX_, &world->pedestrian_->startY_);
     world->pedestrian_->x_ = world->pedestrian_->startX_;
     world->pedestrian_->y_ = world->pedestrian_->startY_;
-    //reinitialize_world_pedestrian(world);
 }
 
 void starting_position(World* world, int* x, int* y) {
