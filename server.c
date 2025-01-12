@@ -3,9 +3,6 @@
 
 #include "server.h"
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-Simulation* active_simulation = NULL;
-
 void send_simulation(int client_socket, Simulation* sim) {
     int bytes_sent = send(client_socket, &sim->singlePlayer_, sizeof(sim->singlePlayer_), 0);
     bytes_sent = send(client_socket, &sim->world_->worldType_, sizeof(sim->world_->worldType_), 0);
@@ -19,10 +16,7 @@ void send_simulation(int client_socket, Simulation* sim) {
     bytes_sent = send(client_socket, sim->world_->outputFileName_, strlen(sim->world_->outputFileName_) + 1, 0);
 }
 
-void* handle_client(void* arg) {
-    int client_socket = *(int*)arg;
-    free(arg);
-
+void handle_client(int client_socket, int server_socket) {
     Message message;
     memset(&message, 0, sizeof(Message));
 
@@ -30,36 +24,28 @@ void* handle_client(void* arg) {
     if (bytes_received <= 0) {
         printf(">>> [SERVER] - Klient bol odpojený.\n");
         close(client_socket);
-        pthread_exit(NULL);
+        return;
     }
 
     if (strcmp(message.command, "CREATE_SIMULATION") == 0) {
         SimulationInputs sp = message.sp;
 
-        pthread_mutex_lock(&mutex);
-        if (active_simulation) {
-            free_simulation(active_simulation);
-        }
-
         Simulation* simulation = (Simulation*)malloc(sizeof(Simulation));
         memset(simulation, 0, sizeof(Simulation));
         create_simulation(&sp, simulation);
-        active_simulation = simulation;
-        pthread_mutex_unlock(&mutex);
 
         send_simulation(client_socket, simulation);
         run_simulation(simulation, client_socket);
-    } else if (strcmp(message.command, "SHUTDOWN_SERVER") == 0)
-    {
+
+        free_simulation(simulation);
+    } else if (strcmp(message.command, "SHUTDOWN_SERVER") == 0) {
         printf(">>> [SERVER] - Server sa vypina... <<<\n");
         close(client_socket);
-        pthread_exit(NULL);
+        close(server_socket);
         exit(0);
     }
-    
 
     close(client_socket);
-    pthread_exit(NULL);
 }
 
 void start_server() {
@@ -99,23 +85,22 @@ void start_server() {
     printf(">>> [SERVER] - Server čaká na pripojenie klienta na porte %d...\n", PORT);
 
     while (1) {
-        int* client_socket = malloc(sizeof(int));
-        *client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_size);
-        if (*client_socket < 0) {
-            perror("Prijatie klienta zlyhalo");
-            free(client_socket);
+        if (getppid() == 1) {
+            printf(">>> [SERVER] - Rodicovsky proces zanikol. Vypina sa server..\n");
+            close(server_socket);
+            exit(0);
+        }
+
+        int client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_size);
+        if (client_socket < 0) {
+            perror("Nepodarilo sa prijať pripojenie");
             continue;
         }
 
-        printf(">>> [SERVER] - Klient pripojený.\n");
-
-        pthread_t thread_id;
-        if (pthread_create(&thread_id, NULL, handle_client, client_socket) != 0) {
-            perror("Nepodarilo sa vytvoriť vlákno");
-            free(client_socket);
-        }
-        pthread_detach(thread_id);
+        handle_client(client_socket, server_socket);
+        usleep(100000);
     }
 
     close(server_socket);
+    exit(0);
 }

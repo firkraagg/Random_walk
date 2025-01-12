@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <sys/select.h>
 #include "Menu.h"
 #include "Message.h"
 

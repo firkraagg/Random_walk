@@ -4,15 +4,19 @@
 
 #include "client.h"
 
-pthread_mutex_t world_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t world_cond = PTHREAD_COND_INITIALIZER;
-int world_ready = 0;
-int end_signal_received = 0;
-int is_connected = 0;
+typedef struct {
+    pthread_mutex_t world_mutex;
+    pthread_cond_t world_cond;
+    int world_ready;
+    int end_signal_received;
+    int is_connected;
+} ClientState;
 
 typedef struct {
     int client_socket;
+    int count;
     World* world;
+    ClientState* state;
 } ThreadArgs;
 
 void run_server() {
@@ -65,7 +69,6 @@ void send_command(int server_socket, const char* command, SimulationInputs* sp) 
     }
 
     int bytes_sent = send(server_socket, &message, sizeof(Message), 0);
-    printf(">>> [KLIENT] - Odoslaný príkaz '%s' s argumentmi: %d bajtov\n", command, bytes_sent);
 }
 
 Simulation* receive_simulation(int server_socket) {
@@ -100,18 +103,9 @@ Simulation* receive_simulation(int server_socket) {
     return sim;
 }
 
-int receive_world(int client_socket, World* world) { 
-    char start_signal;
-    if (recv(client_socket, &start_signal, sizeof(start_signal), 0) == -1 || start_signal != 'S') {
-        end_signal_received = 1;
-        return -1;
-    }
-
-    int num_rows;
-    if (recv(client_socket, &num_rows, sizeof(num_rows), 0) == -1) {
-        perror("Chyba pri prijimani poctu riadkov");
-        return -1;
-    }
+int receive_world(int client_socket, World* world) {
+    fd_set read_fds, write_fds;
+    struct timeval timeout;
 
     if (world->grid_) {
         for (int i = 0; i < world->height_; i++) {
@@ -120,73 +114,122 @@ int receive_world(int client_socket, World* world) {
         free(world->grid_);
     }
 
-    world->grid_ = malloc(num_rows * sizeof(char*));
-    for (int i = 0; i < num_rows; i++) {
+    world->grid_ = malloc(world->height_ * sizeof(char*));
+    if (!world->grid_) {
+        perror("[CLIENT] Alokacia pamate pre hracie pole zlyhala");
+        return -1;
+    }
+
+    for (int i = 0; i < world->height_; i++) {
         world->grid_[i] = malloc(world->width_ * sizeof(char));
-    }
-
-    for (int i = 0; i < num_rows; i++) {
-        if (recv(client_socket, world->grid_[i], world->width_ * sizeof(char), 0) == -1) {
-            perror("Chyba pri prijimani riadku.");
+        if (!world->grid_[i]) {
+            perror("[CLIENT] Alokacia pamate pre riadok zlyhala");
             return -1;
         }
 
-        char ack = 'A';
-        if (send(client_socket, &ack, sizeof(ack), 0) == -1) {
-            perror("Chyba pri odosielani potvrdenia.");
+        memset(world->grid_[i], 0, world->width_ * sizeof(char));
+
+        FD_ZERO(&read_fds);
+        FD_SET(client_socket, &read_fds);
+        timeout.tv_sec = 10;
+        timeout.tv_usec = 0;
+
+        int select_result = select(client_socket + 1, &read_fds, NULL, NULL, &timeout);
+        if (select_result == -1) {
+            perror("[CLIENT] Problem so selectom");
+            return -1;
+        } else if (select_result == 0) {
+            fprintf(stderr, "[CLIENT] Cakanie na socket aby bol citatelny zlyhalo\n");
+            return -1;
+        }
+
+        int bytes_to_receive = world->width_ * sizeof(char);
+        int received_bytes = 0;
+        do {
+            int result = recv(client_socket, world->grid_[i] + received_bytes, bytes_to_receive - received_bytes, 0);
+            if (result == -1) {
+                perror("[CLIENT] Problem s prijatim riadku");
+                close(client_socket);
+                return -1;
+            }
+            received_bytes += result;
+        } while (received_bytes != bytes_to_receive);
+
+        FD_ZERO(&write_fds);
+        FD_SET(client_socket, &write_fds);
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+
+        select_result = select(client_socket + 1, NULL, &write_fds, NULL, &timeout);
+        if (select_result == -1) {
+            perror("[CLIENT] Problem so selectom");
+            return -1;
+        } else if (select_result == 0) {
+            fprintf(stderr, "[CLIENT] Cakanie na socket aby bol zapisovatelny zlyhalo\n");
             return -1;
         }
     }
-    char ack = 'A';
-    if (send(client_socket, &ack, sizeof(ack), 0) == -1) {
-        perror("Chyba pri odosielani potvrdenia.");
-        return 0;
-    }
+    
+    return 0;
 }
 
 void* receive_world_thread(void* arg) {
     ThreadArgs* args = (ThreadArgs*)arg;
     int client_socket = args->client_socket;
     World* world = args->world;
+    int count = args->count;
+    ClientState* state = args->state;
 
     while (1) {
-        pthread_mutex_lock(&world_mutex);
-        if (end_signal_received) {
-            pthread_mutex_unlock(&world_mutex);
+        pthread_mutex_lock(&state->world_mutex);
+        if (state->end_signal_received) {
+            pthread_mutex_unlock(&state->world_mutex);
             break;
         }
-        pthread_mutex_unlock(&world_mutex);
-        
-        if (receive_world(client_socket, world) == -1) {
-            break;
-        }
-        
-        world_ready = 1;
-        pthread_cond_signal(&world_cond);
+        pthread_mutex_unlock(&state->world_mutex);
 
+        if (receive_world(client_socket, world) == -1) {
+            printf("Nepodarilo sa prijat riadok.\n");
+            break;
+        }
+
+        state->world_ready = 1;
+        pthread_cond_signal(&state->world_cond);
+
+        char end_signal;
+        int bytes_to_receive = sizeof(end_signal);
+        int received_bytes = 0;
         usleep(100000);
+        count--;
+        if (count <= 1) {
+            state->end_signal_received = 1;
+            break;
+        }
     }
+
+    state->end_signal_received = 1;
     return NULL;
 }
 
 void* print_world_thread(void* arg) {
     ThreadArgs* args = (ThreadArgs*)arg;
     World* world = args->world;
+    ClientState* state = args->state;
 
     while (1) {
-        pthread_mutex_lock(&world_mutex);
-        while (!world_ready && !end_signal_received) {
-            pthread_cond_wait(&world_cond, &world_mutex);
+        pthread_mutex_lock(&state->world_mutex);
+        while (!state->world_ready && !state->end_signal_received) {
+            pthread_cond_wait(&state->world_cond, &state->world_mutex);
         }
 
-        if (end_signal_received) {
-            pthread_mutex_unlock(&world_mutex);
+        if (state->end_signal_received) {
+            pthread_mutex_unlock(&state->world_mutex);
             break;
         }
 
         print_world(world);
-        world_ready = 0;
-        pthread_mutex_unlock(&world_mutex);
+        state->world_ready = 0;
+        pthread_mutex_unlock(&state->world_mutex);
 
         usleep(100000);
     }
@@ -194,6 +237,14 @@ void* print_world_thread(void* arg) {
 }
 
 void start_client() {
+    ClientState state = {
+        .world_mutex = PTHREAD_MUTEX_INITIALIZER,
+        .world_cond = PTHREAD_COND_INITIALIZER,
+        .world_ready = 0,
+        .end_signal_received = 0,
+        .is_connected = 0
+    };
+
     int client_socket = -1;
     char buffer[BUFFER_SIZE];
 
@@ -214,29 +265,33 @@ void start_client() {
                     free(sp);
                     break;
                 }
-                is_connected = 1;
+                state.is_connected = 1;
                 send_command(client_socket, "CREATE_SIMULATION", sp);
                 
                 Simulation* sim = receive_simulation(client_socket);
                 if (sim) {
-                    ThreadArgs args = {client_socket, sim->world_};
+                    int count = sim->K_ * sim->numReplications_;
+                    ThreadArgs args = {client_socket, count, sim->world_, &state};
                     pthread_t receive_thread, print_thread;
                     pthread_create(&receive_thread, NULL, receive_world_thread, &args);
                     pthread_create(&print_thread, NULL, print_world_thread, &args);
 
-                    while (end_signal_received == 0){}
+                    while (state.end_signal_received == 0){
+                        usleep(100000);
+                    }
                     
                     pthread_join(receive_thread, NULL);
                     pthread_join(print_thread, NULL);
 
                     free_simulation(sim);
+                    
                 } else {
                     printf(">>>[KLIENT] - Nepodarilo sa vytvoriť simuláciu. <<<\n");
                 }
 
-                close(client_socket);
                 free(sp);
-                break;
+                close(client_socket);
+                exit(0);
             }
             case 2: {
                 client_socket = connect_to_server();
@@ -254,21 +309,6 @@ void start_client() {
                 //run_simulation(recreate_simulation());
                 break;
             case 4:
-                if (!is_connected) {
-                    client_socket = connect_to_server();
-                    if (client_socket < 0) {
-                        printf(">>> [KLIENT] - Server neexistuje alebo sa nepodarilo pripojiť na server. <<<\n");
-                        break;
-                    }
-                    is_connected = 1;
-                }
-                
-                send_command(client_socket, "SHUTDOWN_SERVER", NULL);
-                printf(">>> [KLIENT] - Ukončujem... <<<\n");
-                close(client_socket);
-                is_connected = 0;
-                return;
-            case 5:
                 printf(">>> [KLIENT] - Ukončujem... <<<\n");
                 close(client_socket);
                 return;

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <math.h>
+#include <sys/select.h>
 #include "Pedestrian.h"
 
 typedef struct World World;
@@ -39,6 +40,7 @@ typedef struct Simulation {
     SimulationMode mode_;
     bool singlePlayer_;
     World* world_;
+    int pedestrianMidCount_;
 } Simulation;
 
 void create_simulation(SimulationInputs* sp, Simulation* sim);
@@ -50,6 +52,7 @@ void initialize_simulation(Simulation* simulation);
 void save_simulation_results(Simulation* simulation, const char* fileName);
 void load_simulation_results(Simulation* simulation, const char* fileName);
 Simulation* recreate_simulation();
+bool pedestrian_reaches_middle(World* world);
 void free_simulation(Simulation* simulation);
 
 float* choose_probabilities();

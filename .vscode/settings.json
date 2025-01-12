@@ -19,7 +19,9 @@
         "message.h": "c",
         "socket.h": "c",
         "pthread.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "client.h": "c",
+        "signal.h": "c"
     },
     "cmake.options.statusBarVisibility": "hidden"
 }

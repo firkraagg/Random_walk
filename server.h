@@ -12,7 +12,7 @@
 #include "Message.h"
 
 void start_server();
-void* handle_client(void* arg);
+void handle_client(int client_socket, int server_socket);
 void send_simulation(int client_socket, Simulation* sim);
 
 #endif //SERVER_H

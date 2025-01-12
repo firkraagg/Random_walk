@@ -33,7 +33,7 @@ typedef struct World {
     Pedestrian* initial_pedestrian_;
 } World;
 
-void initialize_world(World* world, SimulationMode mode, WorldType worldType, int width, int height, int K, float probabilities[4]);
+void initialize_world(World* world, Pedestrian* pedestrian, SimulationMode mode, WorldType worldType, int width, int height, int K, float probabilities[4]);
 void initialize_probabilities(float probabilities[4], double probabilities_double[4]);
 void allocate_grid(World* world, int height, int width);
 void initialize_grid(World* world, SimulationMode mode, WorldType worldType, int height, int width, int K);

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Site BuildName="Linux-cc"
-	BuildStamp="20250110-0905-Experimental"
+	BuildStamp="20250111-0806-Experimental"
 	Name="Danko"
 	Generator="ctest-3.28.3"
 	CompilerName=""
@@ -24,11 +24,11 @@
 	ProcessorClockFrequency="2894.56"
 	>
 	<Testing>
-		<StartDateTime>Jan 10 21:13 CET</StartDateTime>
-		<StartTestTime>1736540035</StartTestTime>
+		<StartDateTime>Jan 11 09:06 CET</StartDateTime>
+		<StartTestTime>1736582771</StartTestTime>
 		<TestList/>
-		<EndDateTime>Jan 10 21:13 CET</EndDateTime>
-		<EndTestTime>1736540035</EndTestTime>
+		<EndDateTime>Jan 11 09:06 CET</EndDateTime>
+		<EndTestTime>1736582771</EndTestTime>
 		<ElapsedMinutes>0</ElapsedMinutes>
 	</Testing>
 </Site>

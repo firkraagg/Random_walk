@@ -24,7 +24,7 @@ void move_pedestrian(World* world, float probabilities[4]) {
         world->pedestrian_->y_ = (world->pedestrian_->y_ + 1) % world->height_;
     }
 
-    if (world->grid_[world->pedestrian_->y_][world->pedestrian_->x_] == 'O') {
+    if (world->grid_[world->pedestrian_->y_][world->pedestrian_->x_] == 'X') {
         world->pedestrian_->x_ = oldX;
         world->pedestrian_->y_ = oldY;
         move_pedestrian(world, probabilities);
